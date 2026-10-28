@@ -14,7 +14,6 @@ const infoPanel = L.control({ position: 'bottomleft' });
 let infoPanelFocus = {};
 let focusHistory = [];
 let infoBody = null;
-let infoContainer = null;
 
 infoPanel.onAdd = (map) => {
   //create html div
@@ -67,7 +66,9 @@ function refreshDOM() {
         })
       });
     }
-  } else if (infoPanelFocus.layer) {
+  } 
+  
+  else if (infoPanelFocus.layer) {
     const layer = infoPanelFocus.layer;
     infoPanelInnerHTML = `<h2>${layer.feature.properties.name}</h2>`;
     if (layer.feature.properties.diocese) {
@@ -79,6 +80,7 @@ function refreshDOM() {
         const entryLink = L.DomUtil.create('a', 'entry-link', infoBody);
         entryLink.innerHTML = ent.name+'<br>';
         entryLink.href = '#';
+        
         L.DomEvent.on(entryLink, 'click', e => {
           L.DomEvent.stop(e);
           ChooseEntry(ent);
@@ -133,7 +135,8 @@ const dioceses = L.geoJSON(diocesesGeoJSON, {
     feature.properties.entries = [];
     feature.properties.searchName = "Diocese of "+feature.properties.name;
   },
-  chosen: false
+  chosen: false,
+  geoType: 'diocese'
 }).addTo(map);
 
 const provinces = L.geoJSON(provincesGeoJSON, {
@@ -153,7 +156,8 @@ const provinces = L.geoJSON(provincesGeoJSON, {
     feature.properties.entries = [];
     feature.properties.searchName = "Province of "+feature.properties.name;
   },
-  chosen: false
+  chosen: false,
+  geoType: 'province'
 }).addTo(map);
 
 const areas = L.geoJSON(areasGeoJSON, {
@@ -163,7 +167,8 @@ const areas = L.geoJSON(areasGeoJSON, {
   onEachFeature: (feature, layer) => {
     feature.properties.entries = [];
   },
-  chosen: false
+  chosen: false,
+  geoType: 'area'
 })
 
 const places = L.geoJSON(pointsGeoJSON, {
@@ -173,7 +178,8 @@ const places = L.geoJSON(pointsGeoJSON, {
   onEachFeature: (feature, layer) => {
     feature.properties.entries = [];
   },
-  chosen: false
+  chosen: false,
+  geoType: 'place'
 })
 
 const allLayers = L.layerGroup([provinces, dioceses]);
@@ -215,18 +221,40 @@ function ChooseLayer(layer, territory=false, goingBack=false) {
       fillOpacity: 0
     });
   });
+
+  areas.eachLayer((l) => {
+    l.options.chosen = false;
+    l.remove();
+  });
+
+  places.eachLayer((l) => {
+    l.options.chosen = false;
+    l.remove();
+  })
   
   layer.options.chosen = true;
-  layer.setStyle({
-    fillOpacity: 1
-  });
   
-  if (typeof layer.getBounds === 'function') {
+  if (layer.options.geoType === 'diocese' || layer.options.geoType === 'province') {
+    layer.setStyle({
+      fillOpacity: 1
+    });
     map.fitBounds(layer.getBounds(), {
       paddingTopLeft: [500, 100],
       paddingBottomRight: [0, 0]
     });
-  } else if (typeof layer.getLatLng === 'function') {
+  } 
+  
+  else if (layer.options.geoType === 'area'){
+    layer.addTo(map);
+    map.fitBounds(layer.getBounds(), {
+      maxZoom: 8,
+      paddingTopLeft: [500, 100],
+      paddingBottomRight: [0, 0]
+    });
+  } 
+  
+  else if (layer.options.geoType === 'place') {
+    layer.addTo(map);
     map.setView(layer.getLatLng(), 8);
   }
   
@@ -243,10 +271,14 @@ demoJSON.forEach((entry) => {
     entry.name = entry.unitName;
   }
   
+  entry.chosen = false;
   entry.command = [];
+  entry.subdisp = entry.subDispName.split('; ');
+});
 
+demoJSON.forEach((entry) => {
   demoJSON.forEach((innerEntry) => {
-    if (innerEntry.subDispID?.includes(entry.entryID)) {
+    if (innerEntry.subdisp.includes(entry.name)) {
       entry.command.push(innerEntry);
     }
   });
@@ -274,7 +306,6 @@ demoJSON.forEach((entry) => {
     entry.territory.feature.properties.entries.push(entry);
   };
 
-  entry.chosen = false;
 });
 
 function ChooseEntry(entry, goingBack=false) {
@@ -308,10 +339,9 @@ searchBar.on('search:locationfound', (e) => {
 
 map.addControl(searchBar);
 
-
 // test
 demoJSON.forEach((ent) => {
-  if (ent.name === 'Magister peditum') {
+  if (ent.name === 'Comes rei militaris Africae') {
     ChooseEntry(ent);
   }
 });
